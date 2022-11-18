@@ -1,0 +1,6 @@
+[env]
+# ref: https://doc.rust-lang.org/nightly/cargo/reference/config.html#env
+# @note: all values must be string
+# OPENSSL_DIR and OPENSSL_STATIC helps sfackler/rust-openssl
+# OPENSSL_DIR = "/opt/openssl"
+OPENSSL_STATIC = "1"
