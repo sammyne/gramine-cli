@@ -18,4 +18,9 @@ pub enum Cmd {
         #[arg(long, short)]
         out: Option<String>,
     },
+    /// Dump a SIGSTRUCT.
+    DumpSigStruct {
+        #[arg(long = "in", short = 'i')]
+        in_path: String,
+    },
 }

@@ -1,8 +1,16 @@
-use std::fs::File;
+use std::fs::{self, File};
 use std::io;
 
 use crate::app;
 use crate::app::types::KeyFormat;
+
+pub fn dump_sig_struct(path: String) -> Result<(), String> {
+    let b = fs::read(path).map_err(|err| format!("read file: {err}"))?;
+
+    let mut stdout = io::stdout();
+    app::decode_and_dump_sig_struct(&mut stdout, &b)
+        .map_err(|err| format!("decode and dump: {err}"))
+}
 
 pub fn generate_key(out_path: Option<String>) -> Result<(), String> {
     let out_path = match out_path {

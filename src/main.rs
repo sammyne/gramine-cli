@@ -7,5 +7,6 @@ fn main() -> Result<(), String> {
 
     match cli.cmd {
         Cmd::GenerateKey { out } => cmd::generate_key(out),
+        Cmd::DumpSigStruct { in_path } => cmd::dump_sig_struct(in_path),
     }
 }
