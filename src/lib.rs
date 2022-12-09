@@ -1,5 +1,6 @@
 mod app;
 mod cli;
+mod sgx;
 
 pub mod cmd;
 
