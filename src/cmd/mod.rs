@@ -4,6 +4,13 @@ use std::io;
 use crate::app;
 use crate::app::types::KeyFormat;
 
+pub fn dump_quote(path: String) -> Result<(), String> {
+    let b = fs::read(path).map_err(|err| format!("read file: {err}"))?;
+
+    let mut stdout = io::stdout();
+    app::decode_and_dump_quote3(&mut stdout, &b)
+}
+
 pub fn dump_sig_struct(path: String) -> Result<(), String> {
     let b = fs::read(path).map_err(|err| format!("read file: {err}"))?;
 

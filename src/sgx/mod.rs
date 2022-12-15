@@ -2,6 +2,8 @@ use std::fmt::Display;
 
 use encoding::hex;
 
+const LENGTH_REPORT_BODY: usize = 384;
+const LENGTH_QUOTE_HEADER: usize = 48;
 const LENGTH_SIG_STRUCT: usize = 1808;
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -10,6 +12,49 @@ pub struct Attributes {
     pub flags: u64,
     pub xfrm: u64,
 }
+
+/// ref: https://github.com/intel/SGXDataCenterAttestationPrimitives/blob/DCAP_1.14/QuoteGeneration/quote_wrapper/common/inc/sgx_quote_3.h#L177
+#[derive(Clone, Debug, Default)]
+pub struct Quote3 {
+    pub header: QuoteHeader,
+    pub body: ReportBody,
+    pub signature: Vec<u8>,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+#[repr(C, packed)]
+pub struct QuoteHeader {
+    pub version: u16,
+    pub att_key_type: u16,
+    pub att_key_data_0: u32,
+    pub qe_svn: u16,
+    pub pce_svn: u16,
+    pub vendor_id: [u8; 16],
+    pub user_data: [u8; 20],
+}
+const _QUOTE_HEADER: [u8; LENGTH_QUOTE_HEADER] = [0u8; std::mem::size_of::<QuoteHeader>()];
+
+#[derive(Clone, Copy, Debug)]
+#[repr(C, packed)]
+pub struct ReportBody {
+    pub cpu_svn: [u8; 16],
+    pub misc_select: u32,
+    pub reserved1: [u8; 12],
+    pub isv_ext_prod_id: [u8; 16],
+    pub attributes: Attributes,
+    pub mr_enclave: [u8; 32],
+    pub reserved2: [u8; 32],
+    pub mr_signer: [u8; 32],
+    pub reserved3: [u8; 32],
+    pub config_id: [u8; 64],
+    pub isv_prod_id: u16,
+    pub isv_svn: u16,
+    pub config_svn: u16,
+    pub reserved4: [u8; 42],
+    pub isv_family_id: [u8; 16],
+    pub report_data: [u8; 64],
+}
+const _REPORT_BODY: [u8; LENGTH_REPORT_BODY] = [0u8; std::mem::size_of::<ReportBody>()];
 
 /// ref: https://github.com/intel/linux-sgx/blob/sgx_2.18/common/inc/internal/arch.h#L258
 #[derive(Clone, Copy, Debug, Default)]
@@ -71,10 +116,260 @@ pub struct SigStructKey {
 }
 const _SIG_STRUCT_KEY: [u8; 772] = [0; std::mem::size_of::<SigStructKey>()];
 
+impl Default for ReportBody {
+    fn default() -> Self {
+        Self {
+            cpu_svn: Default::default(),
+            misc_select: Default::default(),
+            reserved1: Default::default(),
+            isv_ext_prod_id: Default::default(),
+            attributes: Default::default(),
+            mr_enclave: Default::default(),
+            reserved2: Default::default(),
+            mr_signer: Default::default(),
+            reserved3: Default::default(),
+            config_id: [0u8; 64],
+            isv_prod_id: Default::default(),
+            isv_svn: Default::default(),
+            config_svn: Default::default(),
+            reserved4: [0u8; 42],
+            isv_family_id: Default::default(),
+            report_data: [0u8; 64],
+        }
+    }
+}
+
 impl Display for Attributes {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (flags, xfrm) = (self.flags, self.xfrm);
         write!(f, "flags={:#066b}, xfrm={:#066b}", flags, xfrm)
+    }
+}
+
+impl Display for Quote3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "[header]").unwrap();
+        writeln!(f, "{}", self.header).expect("write header");
+        writeln!(f, "").unwrap();
+
+        writeln!(f, "[body]").unwrap();
+        writeln!(f, "{}", self.body).expect("write body");
+        writeln!(f, "").unwrap();
+
+        writeln!(f, "[sig]").unwrap();
+        writeln!(f, "length = {}", self.signature.len()).expect("write signature_length");
+        writeln!(f, "data   = {}", hex::encode_to_string(self.signature.as_ref())).expect("write signature data");
+
+        Ok(())
+    }
+}
+
+impl TryFrom<&[u8]> for Quote3 {
+    type Error = String;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        let mut v = value;
+
+        let header = QuoteHeader::try_from(v).map_err(|err| format!("parse header: {err}"))?;
+        v = &v[LENGTH_QUOTE_HEADER..];
+
+        let body = ReportBody::try_from(v).map_err(|err| format!("parse report body: {err}"))?;
+        v = &v[LENGTH_REPORT_BODY..];
+
+        let sig_len = u32::from_le_bytes((&v[..4]).try_into().expect("parse signature_length"));
+        v = &v[4..];
+        if v.len() != (sig_len as usize) {
+            let hint = format!("bad sig data length: expect {}, got {}", sig_len, v.len());
+            return Err(hint);
+        }
+
+        let signature = v.to_vec();
+
+        let out = Self {
+            header,
+            body,
+            signature,
+        };
+
+        Ok(out)
+    }
+}
+
+impl Display for QuoteHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pad = |s: &str| -> String { fixed_length_pad(s, 14) };
+
+        let Self {
+            version,
+            att_key_type,
+            att_key_data_0,
+            qe_svn,
+            pce_svn,
+            ..
+        } = *self;
+
+        writeln!(f, "{} = {:#06x}", pad("version"), version).expect("write version");
+        writeln!(f, "{} = {:#06x}", pad("attn_key_type"), att_key_type)
+            .expect("write attn_key_type");
+        writeln!(f, "{} = {:#010x}", pad("attn_key_data0"), att_key_data_0)
+            .expect("write attn_key_data0");
+        writeln!(f, "{} = {:#06x}", pad("qe_svn"), qe_svn).expect("write qe_svn");
+        writeln!(f, "{} = {:#06x}", pad("pce_svn"), pce_svn).expect("write pce_svn");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("vendor_id"),
+            hex::encode_to_string(self.vendor_id.as_ref())
+        )
+        .expect("write vendor-id");
+        write!(
+            f,
+            "{} = {}",
+            pad("user_data"),
+            hex::encode_to_string(self.user_data.as_ref())
+        )
+        .expect("write user-data");
+
+        Ok(())
+    }
+}
+
+impl TryFrom<&[u8]> for QuoteHeader {
+    type Error = String;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        validate_minimum_length(value.len(), LENGTH_QUOTE_HEADER)
+            .map_err(|err| format!("validate length: {err}"))?;
+
+        let out = unsafe { *(value.as_ptr() as *const Self) };
+
+        Ok(out)
+    }
+}
+
+impl Display for ReportBody {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let pad = |s: &str| -> String { fixed_length_pad(s, 15) };
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("cpu-svn"),
+            hex::encode_to_string(self.cpu_svn.as_ref())
+        )
+        .expect("write cpu-svn");
+
+        let Self {
+            misc_select,
+            attributes,
+            isv_prod_id,
+            isv_svn,
+            config_svn,
+            ..
+        } = *self;
+
+        writeln!(f, "{} = {:#034b}", pad("misc_select"), misc_select).expect("write misc_select");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("reserved1"),
+            hex::encode_to_string(self.reserved1.as_ref())
+        )
+        .expect("write reserved1");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("isv_ext_prod_id"),
+            hex::encode_to_string(self.isv_ext_prod_id.as_ref())
+        )
+        .expect("write isv_ext_prod_id");
+
+        writeln!(f, "{} = {}", pad("attributes"), attributes).expect("write attributes");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("mr_enclave"),
+            hex::encode_to_string(self.mr_enclave.as_ref())
+        )
+        .expect("write mr_enclave");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("reserved2"),
+            hex::encode_to_string(self.reserved2.as_ref())
+        )
+        .expect("write reserved2");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("mr_signer"),
+            hex::encode_to_string(self.mr_signer.as_ref())
+        )
+        .expect("write mr_signer");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("reserved3"),
+            hex::encode_to_string(self.reserved3.as_ref())
+        )
+        .expect("write reserved3");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("config_id"),
+            hex::encode_to_string(self.config_id.as_ref())
+        )
+        .expect("write config_id");
+
+        writeln!(f, "{} = {:#06x}", pad("isv_prod_id"), isv_prod_id).expect("write isv_prod_id");
+        writeln!(f, "{} = {:#06x}", pad("isv_svn"), isv_svn).expect("write isv_svn");
+        writeln!(f, "{} = {:#06x}", pad("config_svn"), config_svn).expect("write config_svn");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("reserved4"),
+            hex::encode_to_string(self.reserved4.as_ref())
+        )
+        .expect("write reserved4");
+
+        writeln!(
+            f,
+            "{} = {}",
+            pad("isv_family_id"),
+            hex::encode_to_string(self.isv_family_id.as_ref())
+        )
+        .expect("write isv_family_id");
+
+        write!(
+            f,
+            "{} = {}",
+            pad("report_data"),
+            hex::encode_to_string(self.report_data.as_ref())
+        )
+        .expect("write report_data");
+
+        Ok(())
+    }
+}
+
+impl TryFrom<&[u8]> for ReportBody {
+    type Error = String;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        validate_minimum_length(value.len(), LENGTH_REPORT_BODY)
+            .map_err(|err| format!("validate length: {err}"))?;
+
+        let out = unsafe { *(value.as_ptr() as *const Self) };
+        Ok(out)
     }
 }
 
@@ -90,7 +385,7 @@ impl Display for SigStruct {
         writeln!(f, "{}", self.body).expect("write body");
 
         writeln!(f, "[buffer]").unwrap();
-        writeln!(f, "{}", self.buffer).expect("write buffer");
+        write!(f, "{}", self.buffer).expect("write buffer");
 
         Ok(())
     }
@@ -144,7 +439,6 @@ impl Display for SigStructBuffer {
             hex::encode_to_string(self.reserved.as_ref())
         )
         .expect("write reserved");
-
 
         writeln!(
             f,
@@ -358,4 +652,13 @@ fn fixed_length_pad(s: &str, n: usize) -> String {
     }
 
     out
+}
+
+fn validate_minimum_length(got: usize, minimum: usize) -> Result<(), String> {
+    if minimum <= got {
+        Ok(())
+    } else {
+        let hint = format!("bad length: expect>={}, got={}", minimum, got);
+        Err(hint)
+    }
 }

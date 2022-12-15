@@ -18,6 +18,11 @@ pub enum Cmd {
         #[arg(long, short)]
         out: Option<String>,
     },
+    /// Dump a DCAP-based quote.
+    DumpQuote3 {
+        #[arg(long = "in", short = 'i')]
+        filename: String,
+    },
     /// Dump a SIGSTRUCT.
     DumpSigStruct {
         #[arg(long = "in", short = 'i')]
