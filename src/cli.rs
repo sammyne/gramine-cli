@@ -18,6 +18,12 @@ pub enum Cmd {
         #[arg(long, short)]
         out: Option<String>,
     },
+    /// Check SGX availability.
+    IsSgxAvailable {
+        /// Whether print detailed info.
+        #[arg(long, short)]
+        quite: bool,
+    },
     /// Dump a DCAP-based quote.
     DumpQuote3 {
         #[arg(long = "in", short = 'i')]
