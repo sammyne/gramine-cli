@@ -144,19 +144,19 @@ impl Display for Checker {
 
         writeln!(
             f,
-            "Max enclave size (32-bit): {:#016x}",
+            "Max enclave size (32-bit): {:#018x}",
             self.maximum_enclave_size_x86
         )
         .unwrap();
 
         writeln!(
             f,
-            "Max enclave size (64-bit): {:#016x}",
+            "Max enclave size (64-bit): {:#018x}",
             self.maximum_enclave_size_x64
         )
         .unwrap();
 
-        writeln!(f, "EPC size: {:#016x}", self.epc_region_size).unwrap();
+        writeln!(f, "EPC size: {:#018x}", self.epc_region_size).unwrap();
 
         writeln!(f, "SGX driver loaded:  {}", sgx::driver_loaded()).unwrap();
 
