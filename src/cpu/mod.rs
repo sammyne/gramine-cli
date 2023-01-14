@@ -39,6 +39,8 @@ impl Checker {
         let cpuid_max_leaf_value = id_0_0.eax;
         out.from_intel = is_from_intel(&id_0_0);
         if !out.from_intel || (cpuid_max_leaf_value < 7) {
+            println!("non-intel cpuid(leaf=0,subleaf=0)");
+            println!("{id_0_0}");
             return out;
         }
 
@@ -142,25 +144,36 @@ impl Display for Checker {
 
         writeln!(
             f,
-            "Max enclave size (32-bit): {:016x}",
+            "Max enclave size (32-bit): {:#016x}",
             self.maximum_enclave_size_x86
         )
         .unwrap();
 
         writeln!(
             f,
-            "Max enclave size (64-bit): {:016x}",
+            "Max enclave size (64-bit): {:#016x}",
             self.maximum_enclave_size_x64
         )
         .unwrap();
 
-        writeln!(f, "EPC size: {}", self.epc_region_size).unwrap();
+        writeln!(f, "EPC size: {:#016x}", self.epc_region_size).unwrap();
 
         writeln!(f, "SGX driver loaded:  {}", sgx::driver_loaded()).unwrap();
 
         writeln!(f, "AESMD installed: {}", sgx::aesmd_installed()).unwrap();
 
         write!(f, "SGX PSW/libsgx installed: {}", sgx::psw_installed()).unwrap();
+
+        Ok(())
+    }
+}
+
+impl Display for CpuId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "eax = {:#08x}", self.eax).unwrap();
+        writeln!(f, "ebx = {:#08x}", self.ebx).unwrap();
+        writeln!(f, "ecx = {:#08x}", self.ecx).unwrap();
+        writeln!(f, "edx = {:#08x}", self.edx).unwrap();
 
         Ok(())
     }
