@@ -39,6 +39,7 @@ impl Checker {
         let cpuid_max_leaf_value = id_0_0.eax;
         out.from_intel = is_from_intel(&id_0_0);
         if !out.from_intel || (cpuid_max_leaf_value < 7) {
+            // TODO: figure out why these logs correct check of is_from_intel
             println!("non-intel cpuid(leaf=0,subleaf=0)");
             println!("{id_0_0}");
             return out;
