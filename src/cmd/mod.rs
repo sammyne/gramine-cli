@@ -4,6 +4,8 @@ use std::io;
 use crate::app;
 use crate::app::types::KeyFormat;
 
+pub use app::check_sgx_availability;
+
 pub fn dump_quote(path: String) -> Result<(), String> {
     let b = fs::read(path).map_err(|err| format!("read file: {err}"))?;
 
