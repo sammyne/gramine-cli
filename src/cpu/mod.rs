@@ -46,11 +46,11 @@ impl Checker {
 
         let id_7_0 = cpuid(7, 0);
         out.sgx_supported = (id_7_0.ebx & (1 << 2)) != 0;
-        if !out.sgx_supported || cpuid_max_leaf_value < 0x12 {
+        if !out.sgx_supported || (cpuid_max_leaf_value < 0x12) {
             return out;
         }
 
-        out.flc_supported = (id_7_0.ecx & (1 << 20)) != 0;
+        out.flc_supported = (id_7_0.ecx & (1 << 30)) != 0;
 
         let id_18_0 = cpuid(0x12, 0);
         let id_18_1 = cpuid(0x12, 1);
