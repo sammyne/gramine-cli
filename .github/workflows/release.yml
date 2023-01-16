@@ -1,0 +1,66 @@
+name: release
+
+on:
+  push:
+    tags:
+    - "**"
+
+# For passing artifacts between jobs, see
+#  https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
+jobs:
+  prepare-openssl:
+    runs-on: ubuntu-latest
+    container: 
+      image: sammyne/openssl:1.1.1s-ubuntu20.04
+    steps:
+    - name: Upload the prebuilt openssl
+      uses: actions/upload-artifact@v3
+      with:
+        name: openssl
+        path: /opt/openssl
+    
+  github-release:
+    needs: prepare-openssl
+    runs-on: ubuntu-latest
+    container: 
+      image: rust:1.65.0-bullseye
+    steps:
+    - name: Download the prebuilt openssl
+      uses: actions/download-artifact@v3
+      with:
+        name: openssl
+        path: /opt/openssl
+    # ref: https://docs.github.com/en/actions/using-workflows/workflow-commands-for-github-actions#environment-files
+    # ref: https://docs.github.com/en/actions/learn-github-actions/variables#default-environment-variables
+    # ref: https://stackoverflow.com/a/58178121/10878967
+    - name: Extract tag
+      id: tag-extractor
+      run: echo "tag="echo "tag=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+    - name: Rust toolchains
+      run: |
+        rustc --version &&
+        rustup --version &&
+        cargo --version
+      shell: bash
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.toml') }}
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.toml') }}
+    - name: Build
+      run: |
+        cargo build --release &&
+        cp target/release/gramine-cli gramine-cli-${{ steps.tag-extractor.outputs.tag }}
+      shell: bash
+    - name: Upload artifacts
+      uses: softprops/action-gh-release@v1 
+      with:
+        files: gramine-cli-${{ steps.tag-extractor.outputs.tag }}
