@@ -82,6 +82,7 @@ jobs:
     - name: Build and push the docker images
       run: |
         tag=${GITHUB_REF#refs/*/}
-        repo_tag=sammyne/gramine-cli
-        docker build -t $repo_tag . &&
+        repo_tag=sammyne/gramine-cli:$tag
+        docker build -t $repo_tag .       &&
         docker push $repo_tag
+
